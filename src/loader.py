@@ -1,7 +1,6 @@
 import warnings
 from pathlib import Path
 
-import frontmatter
 import yaml
 
 from src.models import Answer, Question, QuestionType
@@ -19,15 +18,7 @@ def load_question(question_dir: Path) -> Question:
         meta = yaml.safe_load(f)
 
     question_path = question_dir / "question.md"
-    post = frontmatter.load(str(question_path))
-    body = post.content.strip()
-
-    if "type" in post.metadata:
-        warnings.warn(
-            f"{question_path}: 'type' in question.md frontmatter is ignored — "
-            "type is read from meta.yaml only. You can remove it from question.md.",
-            stacklevel=2,
-        )
+    body = question_path.read_text(encoding="utf-8").strip()
 
     # Warn about answer files on disk that are not listed in meta.yaml
     declared_keys = set(meta.get("answers", {}).keys())

@@ -150,20 +150,14 @@ keeping filenames simple and language-neutral.
 
 ### `question.md`
 
-Contains **only the question body** — no answers. YAML frontmatter holds
-question-level metadata. Math uses standard LaTeX delimiters (`$...$` inline,
-`$$...$$` block). Images are standard Markdown image links, resolved relative
-to the question directory.
+Contains **only the question body** — no metadata, no frontmatter, no answers.
+All metadata lives in `meta.yaml`. Math uses standard LaTeX delimiters
+(`$...$` inline, `$$...$$` block). Images are standard Markdown image links,
+resolved relative to the question directory.
 
 #### Example — single-choice question
 
 ```markdown
----
-id: q002-recurrence-merge
-language: he
-tags: [algorithms, sorting, recurrence]
----
-
 לאיזה אלגוריתם מתאימה נוסחת הנסיגה הבאה?
 
 $$T(1) = 0$$
@@ -175,12 +169,6 @@ $$T(n) = 2T\!\left(\frac{n}{2}\right) + n$$
 #### Example — multi-statement question
 
 ```markdown
----
-id: q001-partition
-language: he
-tags: [algorithms, sorting, partition]
----
-
 הפונקציה `partition` מקבלת בתור קלט מערך עם $N$ איברים.
 סמני את הטענות הנכונות (אחת או יותר):
 ```
@@ -315,7 +303,7 @@ class Question:
     type: QuestionType
     language: str       # "he", "en", etc.
     tags: list[str]
-    body: str           # Markdown content of question.md (frontmatter stripped)
+    body: str           # Markdown content of question.md
     answers: list[Answer]
     points: float = 5.0
     assets_dir: str = ""  # absolute path to the question directory
@@ -339,8 +327,8 @@ class Exam:
 Reads one question directory and returns a `Question` dataclass.
 
 Steps:
-1. Read `meta.yaml` — get type, tags, points, and the answer manifest
-2. Read `question.md` using `python-frontmatter` — strip frontmatter, keep body
+1. Read `meta.yaml` — get id, type, language, tags, points, and the answer manifest
+2. Read `question.md` as plain text — the entire file is the question body
 3. For each key in `meta.yaml`'s `answers` dict (`a1`, `a2`, …), read the
    corresponding `a{N}.md` file as a Markdown string
 4. Build and return a validated `Question`
@@ -533,7 +521,6 @@ output: ../my-questions/output
 pyyaml              # YAML parsing
 markdown            # Markdown → HTML
 click               # CLI
-python-frontmatter  # split YAML frontmatter from Markdown body
 lxml                # XML generation
 ```
 

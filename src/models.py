@@ -22,7 +22,7 @@ class Question:
     type: QuestionType
     language: str        # "he", "en", etc.
     tags: list[str]
-    body: str            # Markdown content of question.md (frontmatter stripped)
+    body: str            # Markdown content of question.md
     answers: list[Answer]
     points: float = 5.0
     assets_dir: str = ""  # absolute path to the question directory
