@@ -13,41 +13,122 @@ English code snippets, tables, and images. There is no Hebrew inside equations.
 
 ---
 
-## Repository Structure
+## Two-Repo Design
+
+The tool and the question content are intentionally separated into two repos:
+
+### Public repo: `exam-tool`
+
+Contains all code, documentation, and a small set of example questions.
+Safe to share publicly — no real exam content here.
 
 ```
 exam-tool/
-├── question-bank/
-│   ├── q001-partition/
-│   │   ├── question.md   # question body only
-│   │   ├── a1.md         # answer א
-│   │   ├── a2.md         # answer ב
-│   │   ├── a3.md         # answer ג
-│   │   ├── a4.md         # answer ד
-│   │   ├── a5.md         # answer ה
-│   │   ├── meta.yaml     # type, tags, correct/incorrect + weights per answer
-│   │   └── diagram.png   # optional asset, referenced from question.md or any answer
-│   ├── q002-recurrence-merge/
-│   │   └── ...
-│   └── ...
-├── exams/
-│   └── algorithms-2024-a.yaml  # ordered list of question IDs + exam settings
-├── output/                     # generated files — gitignored
-├── src/
-│   ├── __init__.py
-│   ├── models.py               # dataclasses: Question, Answer, Exam
-│   ├── loader.py               # load and validate a question directory
-│   ├── assembler.py            # build an Exam object from an exam YAML
-│   └── exporters/
-│       ├── __init__.py
-│       ├── base.py             # abstract BaseExporter
-│       └── moodle.py           # Moodle XML exporter (Phase 1)
-│       # typst.py              # Typst/PDF exporter (Phase 2 — add later)
+├── src/                        # all Python source code
+├── example-questions/          # dummy questions showing the format (no real answers)
+│   ├── q-example-single/
+│   ├── q-example-multi/
+│   └── exams/
+│       └── demo.yaml
 ├── docs/
-│   └── architecture.md         # this file
+│   └── architecture.md
 ├── CLAUDE.md
 ├── cli.py
 ├── requirements.txt
+├── .gitignore                  # includes output/, .examtool.yaml
+└── README.md
+```
+
+### Private repo: `my-questions` (or per-course, e.g. `algorithms-questions`)
+
+Contains the real question bank and exam definitions. Never mixed into the
+public repo.
+
+```
+my-questions/
+├── question-bank/
+│   ├── q001-partition/
+│   ├── q002-recurrence-merge/
+│   └── ...
+├── exams/
+│   ├── algorithms-2024-a.yaml
+│   └── algorithms-2025-a.yaml
+└── output/                     # gitignored
+```
+
+### Wiring them together
+
+The tool resolves question banks and exam files through one of three mechanisms,
+in order of precedence:
+
+1. **CLI flags** (highest priority):
+   ```
+   python cli.py export moodle \
+     --bank ../my-questions/question-bank \
+     --exam ../my-questions/exams/algorithms-2024-a.yaml \
+     --output ../my-questions/output/
+   ```
+
+2. **Local config file** `.examtool.yaml` in the working directory (gitignored):
+   ```yaml
+   bank: ../my-questions/question-bank
+   exams: ../my-questions/exams
+   output: ../my-questions/output
+   ```
+   With this file present, bare commands work without flags:
+   ```
+   python cli.py export moodle --exam algorithms-2024-a.yaml
+   ```
+
+3. **Defaults** (lowest priority): `question-bank/`, `exams/`, `output/`
+   relative to the project root — used for the example questions during
+   development and testing.
+
+`.examtool.yaml` must be listed in `.gitignore` in the public repo so each
+user's local paths are never committed.
+
+---
+
+## Repository Structure (public repo in full)
+
+```
+exam-tool/
+├── example-questions/
+│   ├── q-example-single/
+│   │   ├── question.md
+│   │   ├── a1.md
+│   │   ├── a2.md
+│   │   ├── a3.md
+│   │   └── meta.yaml
+│   ├── q-example-multi/
+│   │   ├── question.md
+│   │   ├── a1.md
+│   │   ├── a2.md
+│   │   ├── a3.md
+│   │   ├── a4.md
+│   │   └── meta.yaml
+│   └── exams/
+│       └── demo.yaml
+├── src/
+│   ├── __init__.py
+│   ├── models.py
+│   ├── loader.py
+│   ├── assembler.py
+│   └── exporters/
+│       ├── __init__.py
+│       ├── base.py
+│       └── moodle.py
+│       # typst.py  (Phase 2)
+├── tests/
+│   ├── test_loader.py
+│   ├── test_assembler.py
+│   └── test_moodle_exporter.py
+├── docs/
+│   └── architecture.md
+├── CLAUDE.md
+├── cli.py
+├── requirements.txt
+├── .gitignore
 └── README.md
 ```
 
@@ -199,7 +280,7 @@ answers:
 ```yaml
 id: algorithms-2024-a
 title: "בחינה באלגוריתמים — סמסטר א תשפ״ו"
-course: "אלגוריתמים ומבוד לעיבוד תמונה"
+course: "אלגוריתמים ומבוא לעיבוד תמונה"
 date: "2026-01-15"
 duration_minutes: 90
 instructions: "במבחן 20 שאלות, כל שאלה 5 נקודות. ללא חומר עזר."
@@ -215,7 +296,7 @@ shuffle_answers: false   # preserve original answer order
 ## Data Models (`src/models.py`)
 
 ```python
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 class QuestionType(Enum):
@@ -257,7 +338,7 @@ class Exam:
 
 ## Loader (`src/loader.py`)
 
-The loader reads one question directory and returns a `Question` dataclass.
+Reads one question directory and returns a `Question` dataclass.
 
 Steps:
 1. Read `meta.yaml` — get type, tags, points, and the answer manifest
@@ -280,16 +361,17 @@ Steps:
 Reads an exam YAML file, resolves each question ID to a directory in the
 question bank, calls the loader for each, and returns an `Exam` dataclass.
 
-The question bank root defaults to `question-bank/` relative to the project
-root, but should be configurable (e.g. via CLI option or env var) to support
-multiple question banks.
+The question bank root is resolved in this order:
+1. `--bank` CLI flag
+2. `bank:` key in `.examtool.yaml` in the working directory
+3. Default: `question-bank/` relative to the project root
 
 ---
 
 ## Exporter Interface (`src/exporters/base.py`)
 
 All exporters implement this interface. Adding a new output format (e.g. Typst)
-means adding a new file — no changes to models, loader, or assembler.
+means adding one new file — no changes to models, loader, or assembler.
 
 ```python
 from abc import ABC, abstractmethod
@@ -318,8 +400,7 @@ class BaseExporter(ABC):
 - `single-choice` → `<question type="multichoice">` with `<single>true</single>`
 - `multi-statement` → `<question type="multichoice">` with `<single>false</single>`
 
-Moodle handles all visual formatting (fonts, RTL, layout) after import, so the
-exporter only needs correct content and grading values.
+Moodle handles all visual formatting (fonts, RTL, layout) after import.
 
 ### Grading
 
@@ -359,8 +440,8 @@ Apply this wrapper at the question level and at each answer level when
 
 ### Images
 
-Base64-encode images and embed them as `<file>` elements. Update `<img>` src
-to use Moodle's `@@PLUGINFILE@@` convention:
+Base64-encode images and embed as `<file>` elements. Update `<img>` src to
+use Moodle's `@@PLUGINFILE@@` convention:
 
 ```xml
 <questiontext format="html">
@@ -383,7 +464,7 @@ Resolve image paths relative to `question.assets_dir`.
 <?xml version="1.0" encoding="UTF-8"?>
 <quiz>
   <question type="multichoice">
-    <name><text>q001-partition</text></name>
+    <n><text>q001-partition</text></n>
     <questiontext format="html">
       <text><![CDATA[
         <div dir="rtl" style="text-align: right;">
@@ -413,21 +494,38 @@ Resolve image paths relative to `question.assets_dir`.
 
 ## CLI (`cli.py`)
 
-Use `click`.
+Use `click`. All commands accept `--bank` and `--output` to override defaults.
 
 ```
-python cli.py export moodle --exam exams/algorithms-2024-a.yaml --output output/
-python cli.py export moodle --question question-bank/q001-partition/ --output output/
-python cli.py validate --exam exams/algorithms-2024-a.yaml
-python cli.py validate --question question-bank/q001-partition/
-python cli.py list-questions [--tag algorithms] [--type multi-statement]
+# Export a full exam to Moodle XML
+python cli.py export moodle --exam PATH --bank PATH --output DIR
+
+# Export / preview a single question
+python cli.py export moodle --question PATH --output DIR
+
+# Validate an exam definition and all its questions
+python cli.py validate --exam PATH --bank PATH
+
+# Validate a single question directory
+python cli.py validate --question PATH
+
+# List questions in a bank, with optional filters
+python cli.py list-questions --bank PATH [--tag algorithms] [--type multi-statement]
 ```
 
-`validate` checks:
-- All question IDs in the exam YAML exist in the question bank
-- Every answer file referenced in `meta.yaml` exists on disk
-- For `multi-statement`: fractions derived from weights sum to 100
-- All files are valid UTF-8
+---
+
+## Config File (`.examtool.yaml`)
+
+Optional, gitignored. Allows omitting `--bank`, `--exams`, `--output` flags
+when working from a fixed local setup:
+
+```yaml
+# .examtool.yaml  — local only, never committed
+bank:   ../my-questions/question-bank
+exams:  ../my-questions/exams
+output: ../my-questions/output
+```
 
 ---
 
@@ -447,39 +545,33 @@ lxml                # XML generation
 
 1. `src/models.py` — data classes, no dependencies
 2. `src/loader.py` — parse one question directory; write unit tests using the
-   sample questions below
-3. `src/assembler.py` — load an exam YAML, resolve question IDs
+   example questions
+3. `src/assembler.py` — load an exam YAML, resolve question IDs, honour the
+   three-level bank path resolution
 4. `src/exporters/base.py` — abstract interface
 5. `src/exporters/moodle.py` — Moodle XML exporter
-6. `cli.py` — wire everything together
-7. End-to-end test covering all three sample question types
+6. `cli.py` — wire everything together, including `.examtool.yaml` loading
+7. End-to-end test covering all three example question types
 
 ---
 
-## Sample Questions to Create for Testing
+## Example Questions (`example-questions/`)
 
-Create these in `question-bank/` immediately so there is real data to test
-against. They are taken from the teacher's algorithms exam.
+These live in the public repo to demonstrate the format. They use plausible
+content but have **no real answer keys** — `meta.yaml` correctness values are
+placeholders.
 
-### `question-bank/q001-partition/`
-Multi-statement, no images. Question 1 from the exam: the `partition` function,
-five statements, two correct. Answers include inline math and inline code —
-tests mixed content in answer files.
+### `example-questions/q-example-single/`
+A single-choice question with a math block in the question body and plain-text
+answers. Demonstrates the minimal structure.
 
-### `question-bank/q008-heap-properties/`
-Multi-statement, no images. Question 8 from the exam: max-heap properties,
-five statements. Answer `a3.md` contains $\frac{n-1}{2}$; answer `a2.md`
-contains `i*2+1` and `i*2+2`. Primary test case for math and code inside
-answer files.
+### `example-questions/q-example-multi/`
+A multi-statement question where some answer files contain inline math and
+inline code. Demonstrates the per-file answer structure and weighted grading.
 
-### `question-bank/q002-recurrence-merge/`
-Single-choice, math block in question body. Question 2 from the exam: identify
-the algorithm from its recurrence relation. Tests block math in `question.md`.
-
-### `question-bank/q010-python-sort/`
-Single-choice, code block in question body. Question 10 from the exam: a Python
-snippet using `sorted()` with a lambda. Tests fenced code block handling in
-the question body and in Moodle HTML output.
+### `example-questions/exams/demo.yaml`
+A minimal exam definition referencing the two example questions above.
+Used as the default target for `pytest` and manual smoke-testing.
 
 ---
 
