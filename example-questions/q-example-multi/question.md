@@ -1,6 +1,5 @@
 ---
 id: q-example-multi
-type: multi-statement
 language: he
 tags: [example, algorithms, complexity]
 ---

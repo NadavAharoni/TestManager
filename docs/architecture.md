@@ -160,7 +160,6 @@ to the question directory.
 ```markdown
 ---
 id: q002-recurrence-merge
-type: single-choice
 language: he
 tags: [algorithms, sorting, recurrence]
 ---
@@ -178,7 +177,6 @@ $$T(n) = 2T\!\left(\frac{n}{2}\right) + n$$
 ```markdown
 ---
 id: q001-partition
-type: multi-statement
 language: he
 tags: [algorithms, sorting, partition]
 ---

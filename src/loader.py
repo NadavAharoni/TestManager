@@ -22,6 +22,13 @@ def load_question(question_dir: Path) -> Question:
     post = frontmatter.load(str(question_path))
     body = post.content.strip()
 
+    if "type" in post.metadata:
+        warnings.warn(
+            f"{question_path}: 'type' in question.md frontmatter is ignored — "
+            "type is read from meta.yaml only. You can remove it from question.md.",
+            stacklevel=2,
+        )
+
     # Warn about answer files on disk that are not listed in meta.yaml
     declared_keys = set(meta.get("answers", {}).keys())
     for candidate in question_dir.glob("a*.md"):

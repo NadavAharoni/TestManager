@@ -72,7 +72,7 @@ def test_missing_answer_file(tmp_path):
         },
     }
     (tmp_path / "meta.yaml").write_text(yaml.dump(meta), encoding="utf-8")
-    (tmp_path / "question.md").write_text("---\nid: test-q\n---\nBody", encoding="utf-8")
+    (tmp_path / "question.md").write_text("---\nid: test-q\nlanguage: en\n---\nBody", encoding="utf-8")
     # a1.md intentionally absent
     with pytest.raises(FileNotFoundError, match="a1.md"):
         load_question(tmp_path)

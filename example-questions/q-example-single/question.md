@@ -1,6 +1,5 @@
 ---
 id: q-example-single
-type: single-choice
 language: he
 tags: [example, math]
 ---
