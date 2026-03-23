@@ -227,10 +227,12 @@ and grading weight.
 - Magnitude reflects how wrong the statement is (teacher's judgment)
 - Weights are relative — exporters normalise them to the target format's scale
 
+The question id is taken from the directory name — do not include `id` in
+`meta.yaml`. If present, it will be ignored with a warning.
+
 #### For `single-choice`
 
 ```yaml
-id: q002-recurrence-merge
 type: single-choice
 language: he
 tags: [algorithms, sorting, recurrence]
@@ -246,7 +248,6 @@ answers:
 #### For `multi-statement`
 
 ```yaml
-id: q001-partition
 type: multi-statement
 language: he
 tags: [algorithms, sorting, partition]
@@ -327,7 +328,7 @@ class Exam:
 Reads one question directory and returns a `Question` dataclass.
 
 Steps:
-1. Read `meta.yaml` — get id, type, language, tags, points, and the answer manifest
+1. Read `meta.yaml` — get type, language, tags, points, and the answer manifest; derive id from the directory name
 2. Read `question.md` as plain text — the entire file is the question body
 3. For each key in `meta.yaml`'s `answers` dict (`a1`, `a2`, …), read the
    corresponding `a{N}.md` file as a Markdown string

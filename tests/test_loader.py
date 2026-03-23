@@ -55,6 +55,31 @@ def test_multi_statement_weights():
     assert weights["a4"] == -0.5
 
 
+def test_id_from_directory_name(tmp_path):
+    q_dir = tmp_path / "my-question-dir"
+    q_dir.mkdir()
+    meta = {"type": "single-choice", "language": "en", "tags": [], "points": 5,
+            "answers": {"a1": {"label": "A", "correct": True}}}
+    (q_dir / "meta.yaml").write_text(yaml.dump(meta), encoding="utf-8")
+    (q_dir / "question.md").write_text("Body", encoding="utf-8")
+    (q_dir / "a1.md").write_text("Answer", encoding="utf-8")
+    q = load_question(q_dir)
+    assert q.id == "my-question-dir"
+
+
+def test_id_in_meta_yaml_warns(tmp_path):
+    q_dir = tmp_path / "my-question-dir"
+    q_dir.mkdir()
+    meta = {"id": "something-else", "type": "single-choice", "language": "en",
+            "tags": [], "points": 5, "answers": {"a1": {"label": "A", "correct": True}}}
+    (q_dir / "meta.yaml").write_text(yaml.dump(meta), encoding="utf-8")
+    (q_dir / "question.md").write_text("Body", encoding="utf-8")
+    (q_dir / "a1.md").write_text("Answer", encoding="utf-8")
+    with pytest.warns(UserWarning, match="'id' in meta.yaml is ignored"):
+        q = load_question(q_dir)
+    assert q.id == "my-question-dir"
+
+
 def test_missing_meta_yaml(tmp_path):
     with pytest.raises(FileNotFoundError, match="meta.yaml"):
         load_question(tmp_path)
@@ -62,7 +87,6 @@ def test_missing_meta_yaml(tmp_path):
 
 def test_missing_answer_file(tmp_path):
     meta = {
-        "id": "test-q",
         "type": "single-choice",
         "language": "en",
         "tags": [],

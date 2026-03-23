@@ -48,8 +48,15 @@ def load_question(question_dir: Path) -> Question:
             )
         )
 
+    if "id" in meta:
+        warnings.warn(
+            f"{meta_path}: 'id' in meta.yaml is ignored — "
+            "the question id is taken from the directory name.",
+            stacklevel=2,
+        )
+
     return Question(
-        id=meta["id"],
+        id=question_dir.name,
         type=QuestionType(meta["type"]),
         language=meta.get("language", "en"),
         tags=meta.get("tags", []),
