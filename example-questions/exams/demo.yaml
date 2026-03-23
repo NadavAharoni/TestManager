@@ -1,0 +1,10 @@
+id: demo-exam
+title: "מבחן דוגמה"
+course: "קורס דוגמה"
+date: "2026-01-01"
+duration_minutes: 60
+instructions: "מבחן דוגמה לבדיקת הכלי. ללא חומר עזר."
+questions:
+  - q-example-single
+  - q-example-multi
+shuffle_answers: false

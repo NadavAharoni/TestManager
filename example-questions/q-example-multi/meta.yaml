@@ -1,0 +1,10 @@
+id: q-example-multi
+type: multi-statement
+language: he
+tags: [example, algorithms, complexity]
+points: 5
+answers:
+  a1: { label: "א", correct: true,  weight:  1.0 }
+  a2: { label: "ב", correct: false, weight: -1.0 }
+  a3: { label: "ג", correct: true,  weight:  1.0 }
+  a4: { label: "ד", correct: false, weight: -0.5 }

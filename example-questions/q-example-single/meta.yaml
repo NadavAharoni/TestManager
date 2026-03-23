@@ -1,0 +1,10 @@
+id: q-example-single
+type: single-choice
+language: he
+tags: [example, math]
+points: 5
+answers:
+  a1: { label: "א", correct: false }
+  a2: { label: "ב", correct: false }
+  a3: { label: "ג", correct: true  }
+  a4: { label: "ד", correct: false }

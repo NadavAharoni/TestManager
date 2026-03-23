@@ -1,0 +1,6 @@
+pyyaml
+markdown
+click
+python-frontmatter
+lxml
+pytest
