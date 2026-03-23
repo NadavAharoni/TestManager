@@ -26,11 +26,11 @@ def _convert_math(text: str) -> str:
 
 
 def _md_to_html(text: str) -> str:
-    return md_lib.markdown(text, extensions=["tables", "fenced_code"])
+    return md_lib.markdown(text, extensions=["tables", "fenced_code", "md_in_html"])
 
 
 def _rtl_wrap(html: str) -> str:
-    return f'<div dir="rtl" style="text-align: right;">{html}</div>'
+    return f'<div dir="rtl" style="text-align: start;">{html}</div>'
 
 
 def _process_images(
