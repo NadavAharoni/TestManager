@@ -63,7 +63,7 @@ def run_pandoc(docx_path: Path, media_dir: Path) -> str:
             "pandoc",
             str(docx_path),
             "--from=docx",
-            "--to=markdown",
+            "--to=markdown-simple_tables-multiline_tables",  # force pipe tables; simple/multiline tables mis-align RTL/Unicode content
             "--wrap=none",
             f"--extract-media={media_dir}",
         ],
@@ -166,6 +166,82 @@ def _grid_table_to_html(table_lines):
     return '\n'.join(parts)
 
 
+# ---------------------------------------------------------------------------
+# Pipe-table helpers (GFM | col | col | format)
+# ---------------------------------------------------------------------------
+# Pandoc is invoked with -simple_tables so it uses pipe tables instead of
+# space-aligned simple tables.  Pipe tables split cleanly on '|' regardless
+# of Unicode/RTL content — no character-position arithmetic needed.
+
+_PIPE_SEP = re.compile(r'^\|[-| :]+\|$')   # separator row: |---|---|
+
+
+def _split_pipe_row(line: str) -> list:
+    """'| a | b | c |'  ->  ['a', 'b', 'c']"""
+    return [cell.strip() for cell in line.strip().strip('|').split('|')]
+
+
+def _pipe_table_to_html(table_lines: list) -> str:
+    """Convert a collected pipe-table block to an HTML <table>."""
+    sep_idx = next(
+        (i for i, ln in enumerate(table_lines) if _PIPE_SEP.match(ln.strip())),
+        None,
+    )
+
+    parts = ['<table>']
+    if sep_idx is not None and sep_idx > 0:
+        parts.append('<thead><tr>')
+        for cell in _split_pipe_row(table_lines[0]):
+            parts.append(f'<th>{cell}</th>')
+        parts.append('</tr></thead>')
+        body_lines = table_lines[sep_idx + 1:]
+    else:
+        body_lines = table_lines if sep_idx is None else table_lines[sep_idx + 1:]
+
+    parts.append('<tbody>')
+    for ln in body_lines:
+        ln = ln.strip()
+        if not ln or _PIPE_SEP.match(ln):
+            continue
+        parts.append('<tr>')
+        for cell in _split_pipe_row(ln):
+            parts.append(f'<td>{cell}</td>')
+        parts.append('</tr>')
+    parts.append('</tbody></table>')
+    return '\n'.join(parts)
+
+
+def clean_pipe_tables(text: str) -> str:
+    """
+    Convert pandoc pipe tables to HTML <table> elements.
+
+    Pipe tables look like:
+
+        | Area   | מספר פיקסלים | ערך הפיקסלים |
+        |--------|--------------|--------------|
+        | Area A | 10           | 100          |
+
+    They are produced when pandoc is run with -simple_tables.
+    """
+    lines = text.split('\n')
+    result = []
+    i = 0
+    while i < len(lines):
+        if lines[i].lstrip().startswith('|') and '|' in lines[i].lstrip()[1:]:
+            table_lines = []
+            while i < len(lines) and lines[i].lstrip().startswith('|'):
+                table_lines.append(lines[i])
+                i += 1
+            result.append(_pipe_table_to_html(table_lines))
+        else:
+            result.append(lines[i])
+            i += 1
+
+    out = '\n'.join(result)
+    out = re.sub(r'\n{3,}', '\n\n', out)
+    return out
+
+
 def clean_grid_tables(text: str) -> str:
     """
     Convert pandoc grid tables to HTML <table> elements.
@@ -206,6 +282,7 @@ def clean_markdown(md: str) -> str:
     md = clean_rtl_attrs(md)
     md = fix_image_syntax(md)
     md = clean_grid_tables(md)
+    md = clean_pipe_tables(md)
     md = strip_trailing_whitespace(md)
     return md.strip()
 
