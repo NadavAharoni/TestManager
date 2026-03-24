@@ -163,8 +163,10 @@ keeping filenames simple and language-neutral.
 
 Contains **only the question body** — no metadata, no frontmatter, no answers.
 All metadata lives in `meta.yaml`. Math uses standard LaTeX delimiters
-(`$...$` inline, `$$...$$` block). Images are standard Markdown image links,
-resolved relative to the question directory.
+(`$...$` inline, `$$...$$` block). Images use HTML `<img src="...">` tags
+(not Markdown image syntax), resolved relative to the question directory.
+Tables use HTML `<table>` with `<td markdown="1">` cells so embedded
+content is processed as Markdown by downstream exporters.
 
 #### Example — single-choice question
 

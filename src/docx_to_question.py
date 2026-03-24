@@ -28,8 +28,10 @@ Assumptions / limitations
 - Answers are a numbered list (1. 2. 3. ...) in the document.
 - Images embedded in the doc are extracted and referenced as
   ![](image1.png) etc. (relative - works from the question dir).
-- Table-formatted images (pandoc grid tables) are converted to plain
-  image lines, keeping the caption label as alt text.
+- Tables (pandoc grid tables) are converted to HTML <table> elements.
+  Cell content may contain markdown (images, text); cells are marked
+  with markdown="1" so downstream processors (Python-Markdown md_in_html
+  extension) render embedded markdown correctly.
 - Math: $...$ and $$...$$ are passed through as-is (pandoc preserves them).
 - RTL / Hebrew text: dir="rtl" pandoc span attributes are stripped;
   the language field in meta.yaml carries that info.
@@ -81,37 +83,114 @@ def clean_rtl_attrs(text: str) -> str:
 
 def fix_image_syntax(text: str) -> str:
     """
-    - Strip width/height attrs from images
+    Convert markdown images to <img> tags.
+    - Strip width/height attrs
     - Flatten filename: media/image1.png -> image1.png
-    - Keep label text from table cell as alt text where available
+    - HTML <img> renders correctly in VS Code / GitHub previews and passes
+      through the Moodle exporter's src="..." substitution unchanged.
     """
-    def _clean_img(m):
+    def _to_img_tag(m):
         alt = m.group(1).strip()
         path = Path(m.group(2)).name
-        return f"![{alt}]({path})" if alt else f"![]({path})"
+        return f'<img src="{path}" alt="{alt}">' if alt else f'<img src="{path}">'
 
-    text = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)(?:\{[^}]*\})?', _clean_img, text)
+    text = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)(?:\{[^}]*\})?', _to_img_tag, text)
     return text
+
+
+def _parse_grid_table(table_lines):
+    """
+    Parse pandoc grid table lines into ([], body_rows).
+    All rows are treated as body rows — +===+ separators are ignored
+    since Word tables don't reliably map to semantic headers.
+    Each row is a list of cell strings (may contain markdown).
+    """
+    sep_indices = []
+    for idx, line in enumerate(table_lines):
+        stripped = line.strip()
+        if re.match(r'^\+[-=+]+\+$', stripped):
+            sep_indices.append((idx, '=' in stripped))
+
+    if len(sep_indices) < 2:
+        return [], []
+
+    first_sep = table_lines[sep_indices[0][0]].strip()
+    col_count = first_sep.count('+') - 1
+
+    def extract_cells(content_lines):
+        cells = [''] * col_count
+        for line in content_lines:
+            stripped = line.strip()
+            if not stripped.startswith('|'):
+                continue
+            inner = stripped[1:]
+            if inner.endswith('|'):
+                inner = inner[:-1]
+            parts = inner.split('|')
+            for i, part in enumerate(parts[:col_count]):
+                content = part.strip()
+                if content:
+                    cells[i] = (cells[i] + '\n' + content).strip()
+        return cells
+
+    rows = []
+    for i in range(len(sep_indices) - 1):
+        sep_idx = sep_indices[i][0]
+        next_sep_idx = sep_indices[i + 1][0]
+        content_lines = table_lines[sep_idx + 1:next_sep_idx]
+        if not any(l.strip() for l in content_lines):
+            continue
+        rows.append(extract_cells(content_lines))
+
+    return [], rows
+
+
+def _grid_table_to_html(table_lines):
+    """Convert pandoc grid table lines to an HTML <table> string."""
+    header_rows, body_rows = _parse_grid_table(table_lines)
+    if not header_rows and not body_rows:
+        return '\n'.join(table_lines)
+
+    parts = ['<table>']
+    for row in body_rows:
+        parts.append('<tr>')
+        for cell in row:
+            parts.append(f'<td markdown="1">\n{cell}\n</td>')
+        parts.append('</tr>')
+    parts.append('</table>')
+    return '\n'.join(parts)
 
 
 def clean_grid_tables(text: str) -> str:
     """
-    Remove pandoc grid-table separator lines (rows of dashes).
-    The image and label content inside the table cells is preserved;
-    only the structural separator lines are dropped.
+    Convert pandoc grid tables to HTML <table> elements.
+
+    Scans for grid table blocks (lines starting with + or |) and replaces
+    each with an HTML table. Cell content is preserved as markdown inside
+    markdown="1" attributes for downstream processors.
     """
     lines = text.split('\n')
-    out = []
-    for line in lines:
-        stripped = line.strip()
-        # Grid table separator: line is all dashes, spaces, equals, pipes
-        if stripped and re.match(r'^[-=| ]+$', stripped) and '-' in stripped:
-            continue
-        out.append(line)
+    result = []
+    i = 0
+    while i < len(lines):
+        stripped = lines[i].strip()
+        if re.match(r'^\+[-=+]+\+$', stripped):
+            table_lines = []
+            while i < len(lines):
+                s = lines[i].strip()
+                if re.match(r'^\+[-=+]+\+$', s) or s.startswith('|'):
+                    table_lines.append(lines[i])
+                    i += 1
+                else:
+                    break
+            result.append(_grid_table_to_html(table_lines))
+        else:
+            result.append(lines[i])
+            i += 1
 
-    result = '\n'.join(out)
-    result = re.sub(r'\n{3,}', '\n\n', result)
-    return result
+    out = '\n'.join(result)
+    out = re.sub(r'\n{3,}', '\n\n', out)
+    return out
 
 
 def strip_trailing_whitespace(text: str) -> str:
