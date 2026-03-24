@@ -13,15 +13,31 @@ from src.models import Answer, Exam, Question, QuestionType
 # Text / markup helpers
 # ---------------------------------------------------------------------------
 
+def _normalize_math(expr: str) -> str:
+    """Normalize LaTeX macros that MathJax doesn't support."""
+    expr = expr.replace(r'\lbrack', '[').replace(r'\rbrack', ']')
+    expr = expr.replace(r'\lbrace', '{').replace(r'\rbrace', '}')
+    return expr
+
+
 def _convert_math(text: str) -> str:
     """Convert LaTeX delimiters to Moodle's MathJax format.
 
     Must process $$ before $ to avoid partial matches.
     """
     # Block math: $$...$$ → \[...\]
-    text = re.sub(r'\$\$(.*?)\$\$', r'\\[\1\\]', text, flags=re.DOTALL)
+    text = re.sub(
+        r'\$\$(.*?)\$\$',
+        lambda m: r'\[' + _normalize_math(m.group(1)) + r'\]',
+        text,
+        flags=re.DOTALL,
+    )
     # Inline math: $...$ → \(...\)
-    text = re.sub(r'\$([^\$]+?)\$', r'\\(\1\\)', text)
+    text = re.sub(
+        r'\$([^\$]+?)\$',
+        lambda m: r'\(' + _normalize_math(m.group(1)) + r'\)',
+        text,
+    )
     return text
 
 
@@ -108,7 +124,7 @@ def _question_to_elem(question: Question, shuffle: bool) -> etree._Element:
     etree.SubElement(name_elem, "text").text = question.id
 
     # <questiontext>
-    body_html = _md_to_html(_convert_math(question.body))
+    body_html = _convert_math(_md_to_html(question.body))
     if question.language == "he":
         body_html = _rtl_wrap(body_html)
     body_html, img_files = _process_images(body_html, question.assets_dir)
@@ -132,7 +148,7 @@ def _question_to_elem(question: Question, shuffle: bool) -> etree._Element:
     # <answer> elements
     fractions = _compute_fractions(question.answers, question.type)
     for answer, fraction in zip(question.answers, fractions):
-        ans_html = _md_to_html(_convert_math(answer.text))
+        ans_html = _convert_math(_md_to_html(answer.text))
         if question.language == "he":
             ans_html = _rtl_wrap(ans_html)
         aelem = etree.SubElement(
