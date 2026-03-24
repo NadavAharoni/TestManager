@@ -25,6 +25,11 @@ The script tries to detect the question body vs. answers:
 
 Assumptions / limitations
 --------------------------
+# TODO: Cropped images in docx are exported uncropped. Word stores crop
+#   parameters in <a:srcRect> XML but doesn't modify the embedded image.
+#   Workaround: use Word's "Compress Pictures > Delete cropped areas"
+#   before running this script. A proper fix would parse the docx XML for
+#   crop parameters and apply them to the extracted images via Pillow.
 - Answers are a numbered list (1. 2. 3. ...) in the document.
 - Images embedded in the doc are extracted and referenced as
   ![](image1.png) etc. (relative - works from the question dir).
