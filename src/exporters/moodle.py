@@ -25,8 +25,20 @@ def _convert_math(text: str) -> str:
     return text
 
 
+_TABLE_STYLE = 'style="border-collapse: collapse;"'
+_CELL_STYLE  = 'style="border: 1px solid black; padding: 4px 8px;"'
+
+
+def _style_tables(html: str) -> str:
+    """Inject inline styles on <table>, <th>, and <td> elements."""
+    html = re.sub(r'<table>', f'<table {_TABLE_STYLE}>', html)
+    html = re.sub(r'<(th|td)(\s|>)', rf'<\1 {_CELL_STYLE}\2', html)
+    return html
+
+
 def _md_to_html(text: str) -> str:
-    return md_lib.markdown(text, extensions=["tables", "fenced_code", "md_in_html"])
+    html = md_lib.markdown(text, extensions=["tables", "fenced_code", "md_in_html"])
+    return _style_tables(html)
 
 
 def _rtl_wrap(html: str) -> str:
