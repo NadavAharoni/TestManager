@@ -15,7 +15,7 @@ Output structure
 Usage
 -----
     python docx_to_question.py q20.docx --out my-questions/q020-histograms
-    python docx_to_question.py q20.docx   # defaults to ./<docx-stem>/
+    python docx_to_question.py q20.docx   # defaults to the docx file's directory
 
 The script tries to detect the question body vs. answers:
   - If the entire doc is wrapped in a single numbered list item (item 1),
@@ -227,14 +227,32 @@ def make_meta_yaml(num_answers: int, question_type: str = "single-choice") -> st
 # Main conversion
 # ---------------------------------------------------------------------------
 
+def find_yaml_in_dir(directory: Path):
+    """
+    Return the single yaml file in directory, or None if none exist.
+    Exits with an error if more than one yaml file is found.
+    """
+    yaml_files = list(directory.glob("*.yaml")) + list(directory.glob("*.yml"))
+    if len(yaml_files) > 1:
+        sys.exit(
+            f"Error: multiple YAML files found in {directory}:\n"
+            + "\n".join(f"  {f.name}" for f in yaml_files)
+            + "\nRemove all but one before running."
+        )
+    return yaml_files[0] if yaml_files else None
+
+
 def convert(docx_path: Path, out_dir: Path, question_type: str):
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Run pandoc, extract media into a temp subdir
+    # 1. Check for existing yaml before doing any work
+    existing_yaml = find_yaml_in_dir(out_dir)
+
+    # 2. Run pandoc, extract media into a temp subdir
     tmp_media = out_dir / "_tmp_media"
     raw_md = run_pandoc(docx_path, tmp_media)
 
-    # 2. Move extracted images directly into out_dir
+    # 3. Move extracted images directly into out_dir
     image_src = tmp_media / "media"
     if image_src.exists():
         for img in sorted(image_src.iterdir()):
@@ -244,10 +262,10 @@ def convert(docx_path: Path, out_dir: Path, question_type: str):
     if tmp_media.exists():
         shutil.rmtree(tmp_media)
 
-    # 3. Clean markdown
+    # 4. Clean markdown
     md = clean_markdown(raw_md)
 
-    # 4. Split into question body + answers
+    # 5. Split into question body + answers
     question_body, answers = split_question_answers(md)
 
     if not question_body:
@@ -255,23 +273,37 @@ def convert(docx_path: Path, out_dir: Path, question_type: str):
     if not answers:
         print("  WARNING: no answers detected -- check the docx structure.")
 
-    # 5. Write question.md
+    # 6. Write question.md
     (out_dir / "question.md").write_text(question_body, encoding="utf-8")
     print(f"  question.md  ({len(question_body)} chars)")
 
-    # 6. Write a1.md ... aN.md
+    # 7. Write a1.md ... aN.md
     for i, ans_text in enumerate(answers, 1):
         fname = f"a{i}.md"
         (out_dir / fname).write_text(ans_text, encoding="utf-8")
         print(f"  {fname}  ({len(ans_text)} chars)")
 
-    # 7. Write meta.yaml skeleton
-    meta_text = make_meta_yaml(len(answers), question_type)
-    (out_dir / "meta.yaml").write_text(meta_text, encoding="utf-8")
-    print(f"  meta.yaml  ({len(answers)} answers, type={question_type})")
+    # 8. Handle meta.yaml
+    if existing_yaml:
+        with open(existing_yaml, encoding="utf-8") as f:
+            existing_meta = yaml.safe_load(f)
+        yaml_answers = existing_meta.get("answers", {})
+        yaml_count = len(yaml_answers)
+        if yaml_count != len(answers):
+            print(
+                f"  WARNING: {existing_yaml.name} has {yaml_count} answers "
+                f"but docx has {len(answers)} -- verify manually."
+            )
+        else:
+            print(f"  {existing_yaml.name}  (found, {yaml_count} answers match)")
+    else:
+        meta_text = make_meta_yaml(len(answers), question_type)
+        (out_dir / "meta.yaml").write_text(meta_text, encoding="utf-8")
+        print(f"  meta.yaml  ({len(answers)} answers, type={question_type})")
 
     print(f"\nDone -> {out_dir}")
-    print("Next: open meta.yaml and set 'correct:' values and tags.")
+    if not existing_yaml:
+        print("Next: open meta.yaml and set 'correct:' values and tags.")
 
 
 def main():
@@ -281,7 +313,7 @@ def main():
     parser.add_argument("docx", help="Path to the .docx question file")
     parser.add_argument(
         "--out", "-o",
-        help="Output directory (default: ./<docx-stem>/)",
+        help="Output directory (default: same directory as the docx file)",
         default=None,
     )
     parser.add_argument(
@@ -296,7 +328,7 @@ def main():
     if not docx_path.exists():
         sys.exit(f"Error: file not found: {docx_path}")
 
-    out_dir = Path(args.out) if args.out else Path(docx_path.stem)
+    out_dir = Path(args.out) if args.out else docx_path.parent
     out_dir = out_dir.resolve()
 
     print(f"Converting: {docx_path.name}  ->  {out_dir}")
