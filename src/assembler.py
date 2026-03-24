@@ -6,8 +6,15 @@ from src.loader import load_question
 from src.models import Exam
 
 
-def _resolve_bank(bank_flag: str | None, project_root: Path) -> Path:
-    """Resolve bank path using the three-level priority order."""
+def _resolve_bank(
+    bank_flag: str | None, exam_dir: Path, project_root: Path
+) -> Path:
+    """Resolve bank path using the priority order:
+    1. --bank CLI flag
+    2. bank: in .examtool.yaml
+    3. directory containing the exam YAML file
+    4. question-bank/ relative to the project root
+    """
     if bank_flag:
         return Path(bank_flag)
 
@@ -18,7 +25,7 @@ def _resolve_bank(bank_flag: str | None, project_root: Path) -> Path:
         if "bank" in config:
             return Path(config["bank"])
 
-    return project_root / "question-bank"
+    return exam_dir
 
 
 def assemble_exam(
@@ -32,7 +39,7 @@ def assemble_exam(
     if project_root is None:
         project_root = Path(__file__).parent.parent
 
-    bank_path = _resolve_bank(str(bank) if bank else None, project_root)
+    bank_path = _resolve_bank(str(bank) if bank else None, exam_path.parent, project_root)
 
     with open(exam_path, encoding="utf-8") as f:
         exam_data = yaml.safe_load(f)

@@ -58,7 +58,7 @@ my-questions/
 
 ### Wiring them together
 
-The tool resolves question banks and exam files through one of three mechanisms,
+The tool resolves question banks and exam files through one of four mechanisms,
 in order of precedence:
 
 1. **CLI flags** (highest priority):
@@ -80,7 +80,18 @@ in order of precedence:
    python cli.py export moodle --exam algorithms-2024-a.yaml
    ```
 
-3. **Defaults** (lowest priority): `question-bank/`, `exams/`, `output/`
+3. **Exam file location** (new default): when only `--exam` is given, the
+   question bank defaults to the directory containing the exam YAML file, and
+   the output directory defaults to `output/` within that same directory:
+   ```
+   python cli.py export moodle --exam ../my-questions/exams/algorithms-2024-a.yaml
+   # bank  → ../my-questions/exams/
+   # output → ../my-questions/exams/output/
+   ```
+   This works naturally when questions live alongside exams or when the exam
+   file is at the root of the questions repo.
+
+4. **Defaults** (lowest priority): `question-bank/`, `exams/`, `output/`
    relative to the project root — used for the example questions during
    development and testing.
 
@@ -351,7 +362,8 @@ question bank, calls the loader for each, and returns an `Exam` dataclass.
 The question bank root is resolved in this order:
 1. `--bank` CLI flag
 2. `bank:` key in `.examtool.yaml` in the working directory
-3. Default: `question-bank/` relative to the project root
+3. Directory containing the exam YAML file (so `--exam path/to/exam.yaml` implies `--bank path/to/`)
+4. Default: `question-bank/` relative to the project root
 
 ---
 
@@ -484,7 +496,10 @@ Resolve image paths relative to `question.assets_dir`.
 Use `click`. All commands accept `--bank` and `--output` to override defaults.
 
 ```
-# Export a full exam to Moodle XML
+# Export a full exam to Moodle XML (bank and output inferred from exam file location)
+python cli.py export moodle --exam PATH
+
+# Export a full exam, overriding bank and output
 python cli.py export moodle --exam PATH --bank PATH --output DIR
 
 # Export / preview a single question

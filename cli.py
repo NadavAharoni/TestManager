@@ -38,7 +38,6 @@ def export_moodle(exam, question, bank, output):
     from src.loader import load_question
 
     config = _load_config()
-    output_dir = Path(output or config.get("output", "output"))
     exporter = MoodleExporter()
 
     if exam and question:
@@ -52,11 +51,13 @@ def export_moodle(exam, question, bank, output):
             if exams_dir:
                 exam_path = Path(exams_dir) / exam
         bank_path = Path(bank) if bank else None
+        output_dir = Path(output or config.get("output") or (exam_path.parent / "output"))
         assembled = assemble_exam(exam_path, bank=bank_path)
         out = exporter.export_exam(assembled, output_dir)
         click.echo(f"Exported: {out}")
 
     elif question:
+        output_dir = Path(output or config.get("output", "output"))
         q = load_question(Path(question))
         out = exporter.export_question(q, output_dir)
         click.echo(f"Exported: {out}")
