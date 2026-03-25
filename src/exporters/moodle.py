@@ -14,9 +14,19 @@ from src.models import Answer, Exam, Question, QuestionType
 # ---------------------------------------------------------------------------
 
 def _normalize_math(expr: str) -> str:
-    """Normalize LaTeX macros that MathJax doesn't support."""
+    """Normalize LaTeX macros and workaround Moodle filter quirks.
+
+    Spaces around parentheses: Moodle's TeX filter (when active alongside
+    MathJax) uses a PHP regex that stops collecting at the first bare ')'.
+    Adding a space before every ')' prevents the regex from terminating early
+    inside a formula like O(n).  Whitespace is insignificant in LaTeX math
+    mode so rendering is unaffected.
+    """
     expr = expr.replace(r'\lbrack', '[').replace(r'\rbrack', ']')
     expr = expr.replace(r'\lbrace', '{').replace(r'\rbrace', '}')
+    # Workaround: pad parentheses so Moodle's TeX filter regex doesn't
+    # mistake an inner ')' for the closing delimiter of \(...\).
+    expr = expr.replace('(', '( ').replace(')', ' )')
     return expr
 
 

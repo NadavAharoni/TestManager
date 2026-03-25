@@ -18,7 +18,7 @@ DEMO_EXAM = EXAMPLE_DIR / "exams" / "demo.yaml"
 
 def test_convert_inline_math():
     result = _convert_math("סיבוכיות $O(n)$ היא לינארית")
-    assert r"\(O(n)\)" in result
+    assert r"\(O( n )\)" in result  # parentheses padded to avoid Moodle TeX filter regex bug
     assert "$" not in result
 
 

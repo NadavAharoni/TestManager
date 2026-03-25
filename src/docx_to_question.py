@@ -459,12 +459,13 @@ def convert(docx_path: Path, out_dir: Path, question_type: str):
             print(f"  {existing_yaml.name}  (found, {yaml_count} answers match)")
     else:
         meta_text = make_meta_yaml(len(answers), question_type)
-        (out_dir / "meta.yaml").write_text(meta_text, encoding="utf-8")
-        print(f"  meta.yaml  ({len(answers)} answers, type={question_type})")
+        meta_name = f"{out_dir.name}.yaml"
+        (out_dir / meta_name).write_text(meta_text, encoding="utf-8")
+        print(f"  {meta_name}  ({len(answers)} answers, type={question_type})")
 
     print(f"\nDone -> {out_dir}")
     if not existing_yaml:
-        print("Next: open meta.yaml and set 'correct:' values and tags.")
+        print(f"Next: open {out_dir.name}.yaml and set 'correct:' values and tags.")
 
 
 def main():

@@ -6,13 +6,31 @@ import yaml
 from src.models import Answer, Question, QuestionType
 
 
+def _find_meta(question_dir: Path) -> Path:
+    """
+    Return the single YAML file in question_dir.
+
+    Accepted names (in priority order):
+      1. <dir-name>.yaml  e.g. 15-stretch/15-stretch.yaml
+      2. meta.yaml        (legacy)
+      3. any other *.yaml / *.yml file
+
+    Raises FileNotFoundError if none exist, ValueError if more than one exist.
+    """
+    candidates = sorted(question_dir.glob("*.yaml")) + sorted(question_dir.glob("*.yml"))
+    if not candidates:
+        raise FileNotFoundError(f"No YAML metadata file found in {question_dir}")
+    if len(candidates) > 1:
+        names = ", ".join(p.name for p in candidates)
+        raise ValueError(f"Multiple YAML files in {question_dir}: {names}")
+    return candidates[0]
+
+
 def load_question(question_dir: Path) -> Question:
     """Load a question from its directory and return a Question dataclass."""
     question_dir = Path(question_dir)
 
-    meta_path = question_dir / "meta.yaml"
-    if not meta_path.exists():
-        raise FileNotFoundError(f"Missing meta.yaml in {question_dir}")
+    meta_path = _find_meta(question_dir)
 
     with open(meta_path, encoding="utf-8") as f:
         meta = yaml.safe_load(f)
@@ -20,13 +38,13 @@ def load_question(question_dir: Path) -> Question:
     question_path = question_dir / "question.md"
     body = question_path.read_text(encoding="utf-8").strip()
 
-    # Warn about answer files on disk that are not listed in meta.yaml
+    # Warn about answer files on disk that are not listed in {meta_path.name}
     declared_keys = set(meta.get("answers", {}).keys())
     for candidate in question_dir.glob("a*.md"):
         key = candidate.stem
         if key not in declared_keys:
             warnings.warn(
-                f"{candidate.name} exists in {question_dir} but is not listed in meta.yaml — ignored",
+                f"{candidate.name} exists in {question_dir} but is not listed in {meta_path.name} — ignored",
                 stacklevel=2,
             )
 
@@ -35,7 +53,7 @@ def load_question(question_dir: Path) -> Question:
         ans_path = question_dir / f"{file_key}.md"
         if not ans_path.exists():
             raise FileNotFoundError(
-                f"Answer file {ans_path} is listed in meta.yaml but not found on disk"
+                f"Answer file {ans_path} is listed in {meta_path.name} but not found on disk"
             )
         text = ans_path.read_text(encoding="utf-8").strip()
         answers.append(
@@ -50,7 +68,7 @@ def load_question(question_dir: Path) -> Question:
 
     if "id" in meta:
         warnings.warn(
-            f"{meta_path}: 'id' in meta.yaml is ignored — "
+            f"{meta_path}: 'id' in {meta_path.name} is ignored — "
             "the question id is taken from the directory name.",
             stacklevel=2,
         )
